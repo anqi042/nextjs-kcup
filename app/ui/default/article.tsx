@@ -1,24 +1,40 @@
 'use client';
-import { useState,ChangeEvent } from 'react';
-import Link from 'next/link';
-import {
-    UserGroupIcon,
-    HomeIcon,
-    ArrowRightIcon,
-} from '@heroicons/react/24/outline';
-import clsx from 'clsx'; // css conditional classes
+import {ChangeEvent, useState} from 'react';
+import { useEffect } from 'react';
+
 
 export type ArticleData = {
     _id: string;
     level: number,
     title: string;
     content: string;
-    questions: string[];
+    question: string;
     answers: string[];
+    correctAnsIdx: number,
 }
 
-function Article({ data }: { data: ArticleData }) {
-    const { title, content, questions, answers } = data;
+const FilterDataCallback = (list: ArticleData[], filterLevel: number, changObj?: (obj: ArticleData) => void) => {
+    const data = list.filter((item) => {
+        // range -50 +50
+        return item.level >= filterLevel - 50 && item.level <= filterLevel + 50;
+    })[0];
+    if (data && changObj) {
+        changObj(data);
+        console.log(`change to ${data.level}`)
+    }
+    return data
+}
+let globalCacheList: ArticleData[] = []
+function Article({list, filterLevel}: { list: ArticleData[] , filterLevel: number}) {
+    globalCacheList = list;
+
+
+    const data = FilterDataCallback(list, filterLevel);
+    const [articleObj, setArticleObj] = useState<ArticleData>(data);
+    const cloned = {...articleObj};
+    const {title, content, question, answers, correctAnsIdx, level} = cloned;
+
+
     return (
         <>
             <div
@@ -27,57 +43,83 @@ function Article({ data }: { data: ArticleData }) {
                 <p className="text-gray-700 mt-2">{content}</p>
             </div>
             <div>
-                <RadioGroup answers={answers} questions={questions}/>
+                <RadioGroup answers={answers} question={question}
+                            correctIdx={correctAnsIdx}  level={level}
+                            setArticleObj={setArticleObj}
+                />
             </div>
         </>
     );
 }
 
 
-
-const RadioGroup = ({ questions, answers }: { questions: string[], answers: string[] }) => {
+const RadioGroup = ({question, answers, correctIdx, level, setArticleObj}: {
+    question: string,
+    answers: string[],
+    correctIdx: number,
+    level: number,
+    setArticleObj?: (obj: ArticleData) => void,
+}) => {
     const [selectedOption, setSelectedOption] = useState('');
-    const links = [
-        {name: 'Next', href: '#', icon: ArrowRightIcon},
-    ];
-    const link = links[0]
-    const handleOptionChange = (event: ChangeEvent<HTMLInputElement>) => {
-        setSelectedOption(event.target.value);
-    };
-    const LinkIcon = link.icon;
+    let level1 = level
+    const [nextLevel, setLevelState] = useState(level1);
 
-    const radioButtons = questions.map((question, index) => {
+    const HandleOptionChange = async (event: ChangeEvent<HTMLInputElement>) => {
+        setSelectedOption(event.target.value);
+
+        if ( parseInt(event.target.value) === correctIdx ) {
+            // increase level
+            level1 = level + 50
+        } else {
+            // decrease level
+            level1 = level - 50
+        }
+        setLevelState(level1)
+
+    };
+    useEffect(() => {
+        console.log(`useEffect->`, nextLevel)
+    })
+
+    const handleOnclickOfButton = () => {
+        if (setArticleObj) {
+            console.log(`User's choice: ${selectedOption}`);
+            // fixme calculate next level here
+            console.log(`button->`, nextLevel)
+            FilterDataCallback(globalCacheList, nextLevel, setArticleObj);
+        }
+    }
+
+
+    const radioButtons = answers.map((ans, index) => {
         return (
-            <label key={question} className="flex items-center">
+            <label key={ans} className="flex items-center">
                 <input
                     type="radio"
-                    value={answers[index]}
-                    checked={selectedOption === answers[index]}
-                    onChange={handleOptionChange}
+                    value={index}
+                    checked={parseInt(selectedOption) === index}
+                    onChange={HandleOptionChange}
                     className="form-radio text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                 />
-                <span className="ml-2">{question}</span>
+                <span className="ml-2">{ans}</span>
             </label>
         );
     });
 
+
     return (
         <div className="flex flex-col space-y-2">
-            <label className="font-bold">Select an option:</label>
+            <label className="font-bold">{question}</label>
             <div className="flex flex-col space-y-2">
                 {radioButtons}
             </div>
-            <p className="text-gray-500">Selected option: {selectedOption}</p>
+            <p className="text-gray-500">Selected: {selectedOption}</p>
             <div>
-                <Link
-                    key={link.name}
-                    href={link.href}
-                    className={clsx(
-                        'flex h-[48px] grow items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-sky-100 hover:text-blue-600 md:flex-none md:justify-start md:p-2 md:px-3',
-                    )}>
-                    <LinkIcon className="w-6"/>
-                    <p className="hidden md:block">{link.name}</p>
-                </Link>
+                <button
+                    onClick={handleOnclickOfButton}
+                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 border border-blue-700 rounded">
+                    Button
+                </button>
             </div>
         </div>
     );
